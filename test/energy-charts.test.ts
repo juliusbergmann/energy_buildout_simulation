@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getAustriaScenarioData, normalizeEnergyChartsData } from "@/lib/energy-charts";
+import { clearEnergyChartsCachesForTest, getAustriaScenarioData, normalizeEnergyChartsData } from "@/lib/energy-charts";
 
 const timestamps = [1, 2, 3, 4];
 
 afterEach(() => {
+  clearEnergyChartsCachesForTest();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -115,28 +116,104 @@ describe("normalizeEnergyChartsData", () => {
       deprecated: false
     };
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string | URL | Request) => {
-        const href = String(url);
+    const fetchMock = vi.fn(async (url: string | URL | Request) => {
+      const href = String(url);
 
-        if (href.includes("/installed_power")) {
-          return jsonResponse({ error: "rate limited" }, 429);
-        }
+      if (href.includes("/installed_power")) {
+        return jsonResponse({ error: "rate limited" }, 429);
+      }
 
-        if (href.includes("/cbet")) {
-          return jsonResponse({ error: "not needed" }, 404);
-        }
+      if (href.includes("/cbet")) {
+        return jsonResponse({ error: "not needed" }, 404);
+      }
 
-        return jsonResponse(publicPower);
-      })
-    );
+      return jsonResponse(publicPower);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
 
     const data = await getAustriaScenarioData("2025-02-01", "2025-02-01");
 
     expect(data.baselineCapacityGw.hydroPumped).toBe(4.02);
     expect(data.baselineCapacityGw.fossilGas).toBe(4.28);
     expect(data.sourceUpdatedAt).toBe("2026-05-29T03:01:17.000Z");
+  });
+
+  it("seasonally projects incomplete current-year TWh baselines without replacing the selected profile", async () => {
+    const partial2026 = publicPowerResponse(
+      [
+        Date.parse("2026-01-01T00:00:00Z") / 1000,
+        Date.parse("2026-01-01T00:15:00Z") / 1000
+      ],
+      [
+        series("Load", [100, 100]),
+        series("Residual load", [20, 20]),
+        series("Wind onshore", [8_000_000, 8_000_000]),
+        series("Solar", [2_000_000, 2_000_000])
+      ]
+    );
+    const complete2025 = publicPowerResponse(
+      [
+        Date.parse("2025-01-01T00:00:00Z") / 1000,
+        Date.parse("2025-01-01T00:15:00Z") / 1000,
+        Date.parse("2025-12-31T23:30:00Z") / 1000,
+        Date.parse("2025-12-31T23:45:00Z") / 1000
+      ],
+      [
+        series("Wind onshore", [10_000_000, 10_000_000, 30_000_000, 30_000_000]),
+        series("Solar", [1_000_000, 1_000_000, 7_000_000, 7_000_000])
+      ]
+    );
+    const policy2020 = publicPowerResponse(
+      [
+        Date.parse("2020-01-01T00:00:00Z") / 1000,
+        Date.parse("2020-12-31T23:45:00Z") / 1000
+      ],
+      [series("Wind onshore", [4_000_000, 4_000_000]), series("Solar", [2_000_000, 2_000_000])]
+    );
+
+    const fetchMock = vi.fn(async (url: string | URL | Request) => {
+      const href = String(url);
+
+      if (href.includes("start=2026-01-01") && href.includes("end=2026-12-31")) {
+        return jsonResponse(partial2026);
+      }
+
+      if (href.includes("start=2025-01-01") && href.includes("end=2025-12-31")) {
+        return jsonResponse(complete2025);
+      }
+
+      if (href.includes("start=2020-01-01") && href.includes("end=2020-12-31")) {
+        return jsonResponse(policy2020);
+      }
+
+      if (href.includes("/installed_power")) {
+        return jsonResponse({
+          time: ["2026"],
+          production_types: [capacity("Wind onshore", 4), capacity("Solar AC", 10)],
+          last_update: null,
+          deprecated: false
+        });
+      }
+
+      if (href.includes("/cbet")) {
+        return jsonResponse({ unix_seconds: [], countries: [], deprecated: false });
+      }
+
+      throw new Error(`Unexpected request: ${href}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const data = await getAustriaScenarioData("2026-01-01", "2026-01-01");
+
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("start=2025-01-01"))).toBe(true);
+    expect(data.historicalSeriesMw.windOnshore).toEqual([8_000_000, 8_000_000]);
+    expect(data.baselineAnnualGenerationTwh.windOnshore).toBe(16);
+    expect(data.baselineAnnualGenerationTwh.solar).toBe(8);
+    expect(data.annualGenerationBaselineLabel).toBe(
+      "seasonally projected 2026 Energy-Charts generation using 2025 profile"
+    );
   });
 
   it(
@@ -224,6 +301,14 @@ function annualSeries(name: string, twh: number) {
 
 function capacity(name: string, value: number) {
   return { name, data: [value] };
+}
+
+function publicPowerResponse(unix_seconds: number[], production_types: Array<{ name: string; data: number[] }>) {
+  return {
+    unix_seconds,
+    production_types,
+    deprecated: false
+  };
 }
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {

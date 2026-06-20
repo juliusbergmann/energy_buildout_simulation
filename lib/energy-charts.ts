@@ -30,12 +30,18 @@ type CrossBorderResponse = {
   deprecated: boolean;
 };
 
+type AnnualGenerationBaselineResolution = {
+  label: string;
+  referencePublicPower: PublicPowerResponse | null;
+};
+
 const ENERGY_CHARTS_API = "https://api.energy-charts.info";
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const MAX_FETCH_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 250;
 const MAX_RETRY_DELAY_MS = 2_000;
 const FETCH_TIMEOUT_MS = 10_000;
+const ANNUAL_BASELINE_LOOKBACK_YEARS = 5;
 const QUARTER_HOUR = 0.25;
 const POLICY_BASELINE_YEAR = 2020;
 const EAG_ADDITIONS_TWH = {
@@ -69,6 +75,11 @@ const FALLBACK_INSTALLED_POWER: InstalledPowerResponse = {
 
 const cache = new Map<string, { expiresAt: number; data: NormalizedScenarioData }>();
 const fetchCache = new Map<string, { expiresAt: number; data: unknown }>();
+
+export function clearEnergyChartsCachesForTest() {
+  cache.clear();
+  fetchCache.clear();
+}
 
 export async function getAustriaScenarioData(start: string, end: string) {
   const cacheKey = `${start}:${end}`;
@@ -107,6 +118,7 @@ export async function getAustriaScenarioData(start: string, end: string) {
         `/cbet?country=at&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
       ).catch(() => null)
     ]);
+  const annualGenerationBaseline = await resolveAnnualGenerationBaseline(periodYear, annualPublicPower);
   const publicPower = selectedPublicPower ?? slicePublicPowerResponse(annualPublicPower, start, end);
 
   const normalized = normalizeEnergyChartsData({
@@ -114,6 +126,8 @@ export async function getAustriaScenarioData(start: string, end: string) {
     end,
     publicPower,
     annualPublicPower,
+    annualGenerationBaselineLabel: annualGenerationBaseline.label,
+    annualGenerationReferencePublicPower: annualGenerationBaseline.referencePublicPower,
     policyBaselinePublicPower,
     installedPower,
     crossBorder
@@ -132,6 +146,8 @@ export function normalizeEnergyChartsData({
   end,
   publicPower,
   annualPublicPower,
+  annualGenerationBaselineLabel,
+  annualGenerationReferencePublicPower,
   policyBaselinePublicPower,
   installedPower,
   crossBorder
@@ -140,12 +156,17 @@ export function normalizeEnergyChartsData({
   end: string;
   publicPower: PublicPowerResponse;
   annualPublicPower: PublicPowerResponse;
+  annualGenerationBaselineLabel?: string;
+  annualGenerationReferencePublicPower?: PublicPowerResponse | null;
   policyBaselinePublicPower: PublicPowerResponse;
   installedPower: InstalledPowerResponse;
   crossBorder: CrossBorderResponse | null;
 }): NormalizedScenarioData {
   assertPublicPowerData(publicPower, "selected range");
   assertPublicPowerData(annualPublicPower, "full-year baseline");
+  if (annualGenerationReferencePublicPower) {
+    assertPublicPowerData(annualGenerationReferencePublicPower, "seasonal annual baseline reference");
+  }
   assertPublicPowerData(policyBaselinePublicPower, "2020 policy baseline");
 
   const periodYear = getUtcYear(start);
@@ -155,6 +176,12 @@ export function normalizeEnergyChartsData({
     annualPublicPower.production_types,
     annualPublicPower.unix_seconds.length
   );
+  const annualGenerationReferenceByName = annualGenerationReferencePublicPower
+    ? toSeriesMap(
+        annualGenerationReferencePublicPower.production_types,
+        annualGenerationReferencePublicPower.unix_seconds.length
+      )
+    : null;
   const policyBaselineProductionByName = toSeriesMap(
     policyBaselinePublicPower.production_types,
     policyBaselinePublicPower.unix_seconds.length
@@ -178,10 +205,15 @@ export function normalizeEnergyChartsData({
     historicalResidualMw: getSeries(productionByName, "Residual load", publicPower.unix_seconds.length),
     historicalCrossBorderMw: getCrossBorderSeries(crossBorderByName, fallbackTrading, publicPower.unix_seconds.length),
     baselineCapacityGw: buildBaselineCapacity(installedByName),
-    baselineAnnualGenerationTwh: buildAnnualGenerationTwh(
-      annualProductionByName,
-      annualPublicPower.unix_seconds.length
-    ),
+    baselineAnnualGenerationTwh: annualGenerationReferenceByName
+      ? buildSeasonallyProjectedAnnualGenerationTwh(
+          annualProductionByName,
+          annualPublicPower.unix_seconds.length,
+          annualGenerationReferenceByName,
+          annualGenerationReferencePublicPower!.unix_seconds.length
+        )
+      : buildAnnualGenerationTwh(annualProductionByName, annualPublicPower.unix_seconds.length),
+    annualGenerationBaselineLabel: annualGenerationBaselineLabel ?? getCompleteAnnualBaselineLabel(periodYear),
     policyPresets: buildPolicyPresets(policyBaselineAnnualGenerationTwh),
     historicalSeriesMw: Object.fromEntries(
       CHART_SERIES.map((series) => [
@@ -193,6 +225,7 @@ export function normalizeEnergyChartsData({
     sourceDeprecated: Boolean(
       publicPower.deprecated ||
         annualPublicPower.deprecated ||
+        annualGenerationReferencePublicPower?.deprecated ||
         policyBaselinePublicPower.deprecated ||
         installedPower.deprecated ||
         crossBorder?.deprecated
@@ -220,6 +253,38 @@ function slicePublicPowerResponse(publicPower: PublicPowerResponse, start: strin
   };
 }
 
+async function resolveAnnualGenerationBaseline(
+  periodYear: number,
+  annualPublicPower: PublicPowerResponse
+): Promise<AnnualGenerationBaselineResolution> {
+  if (hasFullYearCoverage(annualPublicPower, periodYear)) {
+    return {
+      label: getCompleteAnnualBaselineLabel(periodYear),
+      referencePublicPower: null
+    };
+  }
+
+  for (
+    let referenceYear = periodYear - 1;
+    referenceYear >= periodYear - ANNUAL_BASELINE_LOOKBACK_YEARS;
+    referenceYear -= 1
+  ) {
+    const range = getFullYearRange(referenceYear);
+    const referencePublicPower = await fetchJson<PublicPowerResponse>(
+      `/public_power?country=at&start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}`
+    );
+
+    if (hasFullYearCoverage(referencePublicPower, referenceYear)) {
+      return {
+        label: `seasonally projected ${periodYear} Energy-Charts generation using ${referenceYear} profile`,
+        referencePublicPower
+      };
+    }
+  }
+
+  throw new Error(`Energy-Charts did not return a complete seasonal reference year for ${periodYear}.`);
+}
+
 function buildBaselineCapacity(installedByName: Map<string, number>): CapacityByTechnology {
   return Object.fromEntries(
     TECHNOLOGIES.map((technology) => [
@@ -235,13 +300,52 @@ function buildAnnualGenerationTwh(
 ): AnnualGenerationByTechnology {
   return Object.fromEntries(
     TECHNOLOGIES.map((technology) => {
-      const generationMwh = technology.productionNames
-        .map((name) => getSeries(productionByName, name, length))
-        .reduce((total, series) => total + sumPositiveEnergy(series), 0);
+      const generationMwh = sumProductionEnergyMwh(productionByName, technology.productionNames, length);
 
       return [technology.id, roundToThree(generationMwh / 1_000_000)];
     })
   ) as AnnualGenerationByTechnology;
+}
+
+function buildSeasonallyProjectedAnnualGenerationTwh(
+  observedProductionByName: Map<string, number[]>,
+  observedLength: number,
+  referenceProductionByName: Map<string, number[]>,
+  referenceLength: number
+): AnnualGenerationByTechnology {
+  const referenceComparableLength = Math.min(observedLength, referenceLength);
+
+  return Object.fromEntries(
+    TECHNOLOGIES.map((technology) => {
+      const observedGenerationMwh = sumProductionEnergyMwh(
+        observedProductionByName,
+        technology.productionNames,
+        observedLength
+      );
+      const referenceFullGenerationMwh = sumProductionEnergyMwh(
+        referenceProductionByName,
+        technology.productionNames,
+        referenceLength
+      );
+      const referenceComparableGenerationMwh = sumProductionEnergyMwh(
+        referenceProductionByName,
+        technology.productionNames,
+        referenceComparableLength
+      );
+      const seasonalShare =
+        referenceFullGenerationMwh > 0 ? referenceComparableGenerationMwh / referenceFullGenerationMwh : 0;
+      const projectedGenerationMwh =
+        seasonalShare > 0 ? observedGenerationMwh / seasonalShare : observedGenerationMwh;
+
+      return [technology.id, roundToThree(projectedGenerationMwh / 1_000_000)];
+    })
+  ) as AnnualGenerationByTechnology;
+}
+
+function sumProductionEnergyMwh(productionByName: Map<string, number[]>, productionNames: string[], length: number) {
+  return productionNames
+    .map((name) => getSeries(productionByName, name, length).slice(0, length))
+    .reduce((total, series) => total + sumPositiveEnergy(series), 0);
 }
 
 function buildPolicyPresets(policyBaselineAnnualGenerationTwh: AnnualGenerationByTechnology): PolicyPreset[] {
@@ -351,6 +455,20 @@ function getFullYearRange(year: number) {
     start: `${year}-01-01`,
     end: `${year}-12-31`
   };
+}
+
+function hasFullYearCoverage(response: PublicPowerResponse, year: number) {
+  const latestTimestamp = response.unix_seconds?.reduce((latest, seconds) => Math.max(latest, seconds), -Infinity);
+
+  if (!latestTimestamp || !Number.isFinite(latestTimestamp)) {
+    return false;
+  }
+
+  return new Date(latestTimestamp * 1000).toISOString().slice(0, 10) >= `${year}-12-31`;
+}
+
+function getCompleteAnnualBaselineLabel(year: number) {
+  return `full-year ${year} Energy-Charts generation`;
 }
 
 function assertPublicPowerData(

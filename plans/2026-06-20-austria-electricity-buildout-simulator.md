@@ -17,6 +17,7 @@ Date: 2026-06-20
 - Update on 2026-06-20: Energy-Charts proxy requests now fail fast on 429 rate limits, cap retry delays for 5xx responses, and use a hard upstream fetch timeout so the simulator does not sit indefinitely in the loading state.
 - Update on 2026-06-20: opening the simulator without `start`/`end` query parameters now defaults to the current ISO week. Shared URLs with explicit dates continue to restore their encoded range.
 - Update on 2026-06-20: the on-page 15-minute interval data table was removed to keep the chart view focused. Full interval data remains available through CSV export.
+- Update on 2026-06-20: incomplete current-year annual generation responses must be projected to a full-year baseline with the latest complete year's seasonal progress curve, so wind and solar targets are not divided by year-to-date generation.
 - Update on 2026-06-20: deployment now supports a production Docker image for VPS hosting using Next.js standalone output, plus a Docker Compose entrypoint for local or server operation.
 
 Reference links:
@@ -39,7 +40,7 @@ Reference links:
 
 - Default capacity values use installed capacity for the selected period's year. If unavailable, use the nearest earlier available year.
 - Users edit absolute annual generation targets in TWh/year for solar, wind, run-of-river hydro, reservoir hydro, biomass, and waste/other small sources. Pumped storage and fossil gas remain absolute `generation_unit_power` controls in GW. Scenario values are encoded in URL query params with unit-qualified names.
-- Annual generation baselines always come from the full historical year for the selected period's start year, even when the displayed simulation range is a day or week.
+- Annual generation baselines come from the full historical year for the selected period's start year, even when the displayed simulation range is a day or week. If the selected period's start year is incomplete, estimate each annual-generation technology's full-year baseline from year-to-date generation divided by the latest complete year's same-period share of annual generation, preserving wind, solar, and hydro seasonality instead of using a simple elapsed-days factor.
 - Scale annual-generation technologies by full-year generation ratio:
 
 ```ts

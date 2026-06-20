@@ -25,6 +25,7 @@ export type NormalizedScenarioData = {
   historicalCrossBorderMw: number[];
   baselineCapacityGw: CapacityByTechnology;
   baselineAnnualGenerationTwh: AnnualGenerationByTechnology;
+  annualGenerationBaselineLabel: string;
   policyPresets: PolicyPreset[];
   historicalSeriesMw: Record<ChartSeriesId, number[]>;
   sourceUpdatedAt: string | null;

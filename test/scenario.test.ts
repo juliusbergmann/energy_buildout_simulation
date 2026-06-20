@@ -37,6 +37,7 @@ const baseData: NormalizedScenarioData = {
     biomass: 7,
     wasteOther: 8
   },
+  annualGenerationBaselineLabel: "full-year 2025 Energy-Charts generation",
   policyPresets: [],
   historicalSeriesMw: {
     solar: [10, 20, 30, 40],
