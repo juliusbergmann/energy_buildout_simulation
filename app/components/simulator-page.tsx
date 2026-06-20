@@ -9,7 +9,6 @@ import {
   ChevronUp,
   Copy,
   RotateCcw,
-  SlidersHorizontal,
   Zap
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type PointerEvent } from "react";
@@ -301,14 +300,6 @@ export function SimulatorPage() {
         <>
           <section className="workbench">
             <aside className="control-panel" aria-label="Generation scenario controls">
-              <div className="panel-heading">
-                <SlidersHorizontal size={18} />
-                <div>
-                  <h2>Generation targets</h2>
-                  <p>Full-year {data.periodYear} generation baseline. Pumped storage and gas stay GW-based.</p>
-                </div>
-              </div>
-
               <div className="control-block">
                 <div className="control-block-heading">
                   <span>Preset</span>
