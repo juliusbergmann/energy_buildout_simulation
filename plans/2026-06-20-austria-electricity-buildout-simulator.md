@@ -14,9 +14,11 @@ Date: 2026-06-20
 - Update on 2026-06-20: date selection now uses an Energy-Charts-style interval selector for day, week, month, and year choices, deriving the `start`/`end` query range for data loading and share URLs.
 - Update on 2026-06-20: the date selector now sits in a compact page-level band below the masthead instead of occupying the main toolbar between the title and action buttons.
 - Update on 2026-06-20: generation target controls use progressive disclosure to reduce visual noise. Simple mode is local UI state, groups technologies by decision area, shows changed rows by default, and keeps all scenario target values URL-shareable.
+- Update on 2026-06-20: the left target controls were tightened further by removing preset descriptions, baseline-source helper sentences, and repeated baseline wording from collapsed controls. Exact baseline values remain in row details.
 - Update on 2026-06-20: Energy-Charts proxy requests now fail fast on 429 rate limits, cap retry delays for 5xx responses, and use a hard upstream fetch timeout so the simulator does not sit indefinitely in the loading state.
 - Update on 2026-06-20: opening the simulator without `start`/`end` query parameters now defaults to the current ISO week. Shared URLs with explicit dates continue to restore their encoded range.
 - Update on 2026-06-20: the on-page 15-minute interval data table was removed to keep the chart view focused. Full interval data remains available through CSV export.
+- Update on 2026-06-20: time-period arrow navigation now stops at the current selectable day/week/month/year, and Energy-Charts HTML/non-JSON responses are reported as controlled proxy errors instead of raw JSON parser failures.
 - Update on 2026-06-20: incomplete current-year annual generation responses must be projected to a full-year baseline with the latest complete year's seasonal progress curve, so wind and solar targets are not divided by year-to-date generation.
 - Update on 2026-06-20: deployment now supports a production Docker image for VPS hosting using Next.js standalone output, plus a Docker Compose entrypoint for local or server operation.
 
@@ -82,7 +84,7 @@ Positive residual means import/dispatch need. Negative residual means surplus/ex
   - Large stacked 15-minute chart with generation areas, pumping consumption below zero, and load line.
   - Legend toggles, zoom/data window, rich tooltips, and responsive mobile layout.
 - Summary metric cards were removed after initial implementation because they duplicated chart/table information and added unnecessary visual weight above the controls.
-- Target-control groups are Wind, Solar, Hydro (run-of-river and reservoir), Dispatch (gas), Storage (pumped hydro), and Other (biomass, waste, and other small sources). Group summaries show current target totals, changed counts, and the baseline source for those totals.
+- Target-control groups are Wind, Solar, Hydro (run-of-river and reservoir), Dispatch (gas), Storage (pumped hydro), and Other (biomass, waste, and other small sources). Group summaries show current target totals and changed counts, with exact baseline values available in expanded rows.
 - Simple mode defaults to compact group headers plus changed rows. Advanced mode exposes all target rows. Exact inputs and sliders are shown only when a row is expanded.
 - Keep full 15-minute interval data available through CSV export from the toolbar; do not render a long interval table below the chart.
 

@@ -306,13 +306,11 @@ export function SimulatorPage() {
                 </div>
                 <div className="preset-controls" aria-label="Scenario presets">
                   <button type="button" onClick={resetScenarioTargets}>
-                    <span>Historical</span>
-                    <small>Baseline</small>
+                    Historical
                   </button>
                   {data.policyPresets.map((preset) => (
                     <button key={preset.id} type="button" onClick={() => applyAnnualPolicyPreset(preset)}>
-                      <span>{preset.label}</span>
-                      <small>{preset.description}</small>
+                      {preset.label}
                     </button>
                   ))}
                 </div>
@@ -320,7 +318,7 @@ export function SimulatorPage() {
 
               <div className="control-block">
                 <div className="control-block-heading">
-                  <span>Manual targets</span>
+                  <span>Targets</span>
                   <div className="mode-switch" aria-label="Target detail level">
                     <button
                       type="button"
@@ -354,11 +352,10 @@ export function SimulatorPage() {
                         <span className="target-group-main">
                           <span className="target-group-title-line">
                             <span className="target-group-name">{group.label}</span>
-                            <span className={`target-status-pill ${summary.changedCount > 0 ? "is-changed" : ""}`}>
-                              {summary.statusLabel}
-                            </span>
+                            {summary.statusLabel ? (
+                              <span className="target-status-pill is-changed">{summary.statusLabel}</span>
+                            ) : null}
                           </span>
-                          <span className="target-group-source">{summary.sourceLabel}</span>
                         </span>
                         <span className="target-group-metrics">
                           <strong>{summary.targetLabel}</strong>
@@ -516,10 +513,10 @@ function TargetTechnologyRow({
       >
         <span className="series-swatch" style={{ backgroundColor: technology.color }} />
         <span className="target-row-labels">
-          <span className="target-row-name">{technology.label}</span>
+          <span className="target-row-name">{technology.shortLabel}</span>
           <span className="target-row-subline">{getTechnologyRatioLabel(value, baseline)}</span>
         </span>
-        {isChanged ? <span className="change-pill">changed</span> : null}
+        {isChanged ? <span className="change-pill">edit</span> : null}
         <span className="target-row-value">
           <strong>{formatNumber(value)}</strong>
           <span>{unit}</span>
@@ -554,9 +551,9 @@ function TargetTechnologyRow({
           />
           <div className="capacity-footnote">
             <span>
-              {formatNumber(baseline)} {unit} baseline
+              Base {formatNumber(baseline)} {unit}
             </span>
-            <span>{baseline > 0 ? `${formatNumber(value / baseline)}x` : "no profile baseline"}</span>
+            <span>{baseline > 0 ? `${formatNumber(value / baseline)}x` : "No base"}</span>
           </div>
         </div>
       ) : null}
@@ -1151,27 +1148,17 @@ function getTargetGroupSummary(
   return {
     changedCount,
     targetLabel: `${formatNumber(targetTotal)} ${unit}`,
-    baselineLabel: `${formatNumber(baselineTotal)} ${unit} baseline`,
-    sourceLabel: getTargetGroupSourceLabel(data, technologies[0]),
-    statusLabel: changedCount === 0 ? "baseline" : technologies.length === 1 ? "changed" : `${changedCount} changed`
+    baselineLabel: `Base ${formatNumber(baselineTotal)} ${unit}`,
+    statusLabel: changedCount === 0 ? null : technologies.length === 1 ? "edit" : `${changedCount} edits`
   };
-}
-
-function getTargetGroupSourceLabel(data: NormalizedScenarioData, technology: Technology) {
-  const baselineSource =
-    technology.controlMode === "capacityGw"
-      ? `${data.periodYear} Energy-Charts installed capacity`
-      : `full-year ${data.periodYear} Energy-Charts generation`;
-
-  return `Target: scenario values · Baseline: ${baselineSource}`;
 }
 
 function getTechnologyRatioLabel(value: number, baseline: number) {
   if (baseline <= 0) {
-    return "no profile baseline";
+    return "No base";
   }
 
-  return `${formatNumber(value / baseline)}x baseline`;
+  return `${formatNumber(value / baseline)}x`;
 }
 
 function getScenarioParamName(technology: Technology) {
