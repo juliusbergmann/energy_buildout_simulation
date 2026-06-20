@@ -3,6 +3,15 @@ import type { ChartSeriesId, TechnologyId } from "./technologies";
 export type SeriesValues = Record<string, number[]>;
 
 export type CapacityByTechnology = Record<TechnologyId, number>;
+export type AnnualGenerationByTechnology = Record<TechnologyId, number>;
+export type ScenarioTargetsByTechnology = Record<TechnologyId, number>;
+
+export type PolicyPreset = {
+  id: "eag2030" | "necpWam2030";
+  label: string;
+  description: string;
+  annualGenerationTwh: Partial<AnnualGenerationByTechnology>;
+};
 
 export type NormalizedScenarioData = {
   start: string;
@@ -15,6 +24,8 @@ export type NormalizedScenarioData = {
   historicalResidualMw: number[];
   historicalCrossBorderMw: number[];
   baselineCapacityGw: CapacityByTechnology;
+  baselineAnnualGenerationTwh: AnnualGenerationByTechnology;
+  policyPresets: PolicyPreset[];
   historicalSeriesMw: Record<ChartSeriesId, number[]>;
   sourceUpdatedAt: string | null;
   sourceDeprecated: boolean;

@@ -1,15 +1,15 @@
-import { CHART_SERIES } from "./technologies";
-import type { CapacityByTechnology, NormalizedScenarioData, ScenarioResult } from "./types";
+import { CHART_SERIES, getTechnology, type TechnologyId } from "./technologies";
+import type { NormalizedScenarioData, ScenarioResult, ScenarioTargetsByTechnology } from "./types";
 
 const QUARTER_HOUR = 0.25;
 
 export function runBalanceScenario(
   data: NormalizedScenarioData,
-  scenarioCapacityGw: CapacityByTechnology
+  scenarioTargets: ScenarioTargetsByTechnology
 ): ScenarioResult {
   const seriesMw = Object.fromEntries(
     CHART_SERIES.map((series) => {
-      const scale = getScaleFactor(data.baselineCapacityGw[series.technologyId], scenarioCapacityGw[series.technologyId]);
+      const scale = getTechnologyScaleFactor(data, series.technologyId, scenarioTargets[series.technologyId]);
       return [series.id, data.historicalSeriesMw[series.id].map((value) => value * scale)];
     })
   ) as ScenarioResult["seriesMw"];
@@ -30,8 +30,13 @@ export function runBalanceScenario(
   const renewableGenerationGwh = toGwh(sumEnergy(renewableGenerationMw));
   const deficitGwh = toGwh(sumEnergy(residualMw.map((value) => Math.max(value, 0))));
   const surplusGwh = toGwh(sumEnergy(residualMw.map((value) => Math.max(-value, 0))));
-  const peakDeficitMw = Math.max(0, ...residualMw);
-  const peakSurplusMw = Math.max(0, ...residualMw.map((value) => -value));
+  let peakDeficitMw = 0;
+  let peakSurplusMw = 0;
+
+  for (const value of residualMw) {
+    peakDeficitMw = Math.max(peakDeficitMw, value);
+    peakSurplusMw = Math.max(peakSurplusMw, -value);
+  }
 
   return {
     timestamps: data.timestamps,
@@ -54,12 +59,26 @@ export function runBalanceScenario(
   };
 }
 
-export function getScaleFactor(baselineCapacityGw: number, scenarioCapacityGw: number) {
-  if (baselineCapacityGw <= 0) {
+export function getScaleFactor(baselineValue: number, scenarioValue: number) {
+  if (baselineValue <= 0) {
     return 0;
   }
 
-  return scenarioCapacityGw / baselineCapacityGw;
+  return scenarioValue / baselineValue;
+}
+
+function getTechnologyScaleFactor(
+  data: NormalizedScenarioData,
+  technologyId: TechnologyId,
+  scenarioTarget: number
+) {
+  const technology = getTechnology(technologyId);
+  const baseline =
+    technology.controlMode === "capacityGw"
+      ? data.baselineCapacityGw[technologyId]
+      : data.baselineAnnualGenerationTwh[technologyId];
+
+  return getScaleFactor(baseline, scenarioTarget);
 }
 
 export function sumEnergy(valuesMw: number[]) {

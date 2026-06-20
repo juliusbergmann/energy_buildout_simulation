@@ -19,6 +19,8 @@ export type ChartSeriesId =
   | "biomass"
   | "wasteOther";
 
+export type TechnologyControlMode = "annualGenerationTwh" | "capacityGw";
+
 export type Technology = {
   id: TechnologyId;
   label: string;
@@ -28,6 +30,7 @@ export type Technology = {
   productionNames: string[];
   renewable: boolean;
   adjustable: boolean;
+  controlMode: TechnologyControlMode;
 };
 
 export type ChartSeriesDefinition = {
@@ -49,7 +52,8 @@ export const TECHNOLOGIES: Technology[] = [
     installedCapacityNames: ["Solar AC", "Solar"],
     productionNames: ["Solar"],
     renewable: true,
-    adjustable: true
+    adjustable: true,
+    controlMode: "annualGenerationTwh"
   },
   {
     id: "windOnshore",
@@ -59,7 +63,8 @@ export const TECHNOLOGIES: Technology[] = [
     installedCapacityNames: ["Wind onshore"],
     productionNames: ["Wind onshore"],
     renewable: true,
-    adjustable: true
+    adjustable: true,
+    controlMode: "annualGenerationTwh"
   },
   {
     id: "hydroRunRiver",
@@ -69,7 +74,8 @@ export const TECHNOLOGIES: Technology[] = [
     installedCapacityNames: ["Hydro Run-of-River"],
     productionNames: ["Hydro Run-of-River"],
     renewable: true,
-    adjustable: true
+    adjustable: true,
+    controlMode: "annualGenerationTwh"
   },
   {
     id: "hydroReservoir",
@@ -79,7 +85,8 @@ export const TECHNOLOGIES: Technology[] = [
     installedCapacityNames: ["Hydro water reservoir"],
     productionNames: ["Hydro water reservoir"],
     renewable: true,
-    adjustable: true
+    adjustable: true,
+    controlMode: "annualGenerationTwh"
   },
   {
     id: "hydroPumped",
@@ -89,7 +96,8 @@ export const TECHNOLOGIES: Technology[] = [
     installedCapacityNames: ["Hydro pumped storage"],
     productionNames: ["Hydro pumped storage", "Hydro pumped storage consumption"],
     renewable: true,
-    adjustable: true
+    adjustable: true,
+    controlMode: "capacityGw"
   },
   {
     id: "fossilGas",
@@ -99,7 +107,8 @@ export const TECHNOLOGIES: Technology[] = [
     installedCapacityNames: ["Fossil gas"],
     productionNames: ["Fossil gas"],
     renewable: false,
-    adjustable: true
+    adjustable: true,
+    controlMode: "capacityGw"
   },
   {
     id: "biomass",
@@ -109,7 +118,8 @@ export const TECHNOLOGIES: Technology[] = [
     installedCapacityNames: ["Biomass"],
     productionNames: ["Biomass"],
     renewable: true,
-    adjustable: true
+    adjustable: true,
+    controlMode: "annualGenerationTwh"
   },
   {
     id: "wasteOther",
@@ -119,7 +129,8 @@ export const TECHNOLOGIES: Technology[] = [
     installedCapacityNames: ["Waste", "Others", "Other renewables", "Geothermal"],
     productionNames: ["Waste", "Others", "Other renewables", "Geothermal"],
     renewable: false,
-    adjustable: true
+    adjustable: true,
+    controlMode: "annualGenerationTwh"
   }
 ];
 

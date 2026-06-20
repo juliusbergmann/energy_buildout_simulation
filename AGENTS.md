@@ -12,3 +12,7 @@
 - Every PR must explain what was implemented, why the change was made, and how it was verified.
 - If the implementation diverges from the linked plan, document the deviation and the reason in the PR.
 - If no plan applies, explicitly write that in the PR and explain why the change does not need one.
+
+## Git Workflow
+
+- Keep completed, verified work committed in logical checkpoints unless the user asks not to commit.
