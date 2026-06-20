@@ -1,0 +1,12 @@
+services:
+  simulator:
+    build:
+      context: .
+    image: electricity-buildout-simulation:latest
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      PORT: "3000"
+    restart: unless-stopped
