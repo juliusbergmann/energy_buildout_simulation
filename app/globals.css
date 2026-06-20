@@ -361,18 +361,22 @@ h2 {
 
 .preset-controls button {
   display: grid;
-  min-height: 48px;
+  min-width: 0;
+  min-height: 38px;
   align-content: center;
   gap: 2px;
-  padding: 7px 8px;
+  padding: 7px 9px;
   color: var(--ink);
   font: inherit;
   font-weight: 780;
+  line-height: 1.1;
   text-align: left;
+  overflow-wrap: anywhere;
   background: #f5f8f8;
   border: 1px solid var(--line);
   border-radius: 6px;
   cursor: pointer;
+  outline: 0;
 }
 
 .preset-controls button:hover {
@@ -380,14 +384,9 @@ h2 {
   background: #eef6f4;
 }
 
-.preset-controls small {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.preset-controls button:focus-visible {
+  border-color: #0b61d8;
+  box-shadow: inset 0 0 0 2px #0b61d8;
 }
 
 .mode-switch {
